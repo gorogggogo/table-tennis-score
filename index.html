@@ -3,166 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>卓球スコアアプリ</title>
+  <title>卓球スコアアプリ（シンプル版）</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 480px;
-      margin: 20px auto;
-      padding: 0 10px;
+      max-width: 400px;
+      margin: 30px auto;
       text-align: center;
     }
     h1 {
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
     .scoreboard {
       display: flex;
       justify-content: space-around;
-      margin: 20px 0;
       font-size: 48px;
       font-weight: bold;
+      margin-bottom: 20px;
     }
     button {
       font-size: 24px;
-      padding: 10px 20px;
+      padding: 8px 15px;
       margin: 5px;
       cursor: pointer;
     }
-    .sets {
+    #setsDisplay {
+      font-size: 20px;
       margin-top: 20px;
-    }
-    .sets span {
-      margin: 0 5px;
-      font-weight: bold;
+      white-space: pre-line; /* 改行を有効に */
     }
   </style>
 </head>
 <body>
-  <h1>卓球スコアアプリ</h1>
-
+  <h1>卓球スコア</h1>
   <div class="scoreboard">
     <div>
       <div>チーム A</div>
       <div id="scoreA">0</div>
-      <button id="addA">+1</button>
-      <button id="subA">-1</button>
+      <button onclick="changeScore('A', 1)">+1</button>
+      <button onclick="changeScore('A', -1)">-1</button>
     </div>
     <div>
       <div>チーム B</div>
       <div id="scoreB">0</div>
-      <button id="addB">+1</button>
-      <button id="subB">-1</button>
+      <button onclick="changeScore('B', 1)">+1</button>
+      <button onclick="changeScore('B', -1)">-1</button>
     </div>
   </div>
 
-  <div>
-    <label>セット数: 
-      <select id="maxSets">
-        <option value="1">1</option>
-        <option value="3" selected>3</option>
-        <option value="5">5</option>
-        <option value="7">7</option>
-      </select>
-    </label>
-  </div>
-
-  <div class="sets" id="setsDisplay"></div>
+  <div id="setsDisplay"></div>
 
   <script>
-    // 状態管理用オブジェクト
-    let matchState = {
+    let match = {
       scoreA: 0,
       scoreB: 0,
+      sets: [],
       currentSet: 1,
       maxSets: 3,
-      sets: [], // 各セットの結果 [{A:3,B:1}, ...]
     };
 
-    // スコアをUIに反映
-    function updateUIFromMatchState() {
-      document.getElementById('scoreA').textContent = matchState.scoreA;
-      document.getElementById('scoreB').textContent = matchState.scoreB;
+    function updateDisplay() {
+      document.getElementById('scoreA').textContent = match.scoreA;
+      document.getElementById('scoreB').textContent = match.scoreB;
 
-      const setsDiv = document.getElementById('setsDisplay');
-      setsDiv.innerHTML = '';
-      matchState.sets.forEach((set, i) => {
-        const span = document.createElement('span');
-        span.textContent = `セット${i + 1}: A ${set.A} - B ${set.B}`;
-        setsDiv.appendChild(span);
+      let setsText = '';
+      match.sets.forEach((set, i) => {
+        setsText += `セット${i + 1}: A ${set.A} - B ${set.B}\n`;
       });
+      document.getElementById('setsDisplay').textContent = setsText;
     }
 
-    // LocalStorageに保存
-    function saveMatchState() {
-      localStorage.setItem('tableTennisMatch', JSON.stringify(matchState));
-    }
-
-    // LocalStorageから読み込み
-    function loadMatchState() {
-      const saved = localStorage.getItem('tableTennisMatch');
-      if (saved) {
-        matchState = JSON.parse(saved);
-      }
-      updateUIFromMatchState();
-      document.getElementById('maxSets').value = matchState.maxSets;
-    }
-
-    // ポイント追加・減算処理
-    function addPoint(team) {
+    function changeScore(team, delta) {
       if (team === 'A') {
-        matchState.scoreA++;
+        match.scoreA = Math.max(0, match.scoreA + delta);
       } else {
-        matchState.scoreB++;
+        match.scoreB = Math.max(0, match.scoreB + delta);
       }
-      checkSetWin();
-      saveMatchState();
-      updateUIFromMatchState();
+      checkSetEnd();
+      updateDisplay();
     }
 
-    function subPoint(team) {
-      if (team === 'A' && matchState.scoreA > 0) {
-        matchState.scoreA--;
-      } else if (team === 'B' && matchState.scoreB > 0) {
-        matchState.scoreB--;
-      }
-      saveMatchState();
-      updateUIFromMatchState();
-    }
-
-    // セット勝利判定（シンプル：先に11点、2点差以上で勝ち）
-    function checkSetWin() {
-      const {scoreA, scoreB} = matchState;
-      if (
-        (scoreA >= 11 || scoreB >= 11) &&
-        Math.abs(scoreA - scoreB) >= 2
-      ) {
+    function checkSetEnd() {
+      const diff = Math.abs(match.scoreA - match.scoreB);
+      if ((match.scoreA >= 11 || match.scoreB >= 11) && diff >= 2) {
         // セット終了
-        matchState.sets.push({A: scoreA, B: scoreB});
-        matchState.currentSet++;
-        matchState.scoreA = 0;
-        matchState.scoreB = 0;
-
-        // 最大セット数に達したかチェック（シンプルに最初の勝利者で止めない実装）
-        if (matchState.currentSet > matchState.maxSets) {
+        match.sets.push({ A: match.scoreA, B: match.scoreB });
+        match.currentSet++;
+        match.scoreA = 0;
+        match.scoreB = 0;
+        if (match.currentSet > match.maxSets) {
           alert('試合終了！');
         }
       }
     }
 
-    // セット数変更イベント
-    document.getElementById('maxSets').addEventListener('change', e => {
-      matchState.maxSets = Number(e.target.value);
-      saveMatchState();
-    });
-
-    // ボタンイベント設定
-    document.getElementById('addA').addEventListener('click', () => addPoint('A'));
-    document.getElementById('addB').addEventListener('click', () => addPoint('B'));
-    document.getElementById('subA').addEventListener('click', () => subPoint('A'));
-    document.getElementById('subB').addEventListener('click', () => subPoint('B'));
-
-    // ページ読み込み時に保存データ復元
-    window.onload = loadMatchState;
+    updateDisplay();
   </script>
 </body>
 </html>
