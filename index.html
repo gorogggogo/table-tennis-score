@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>卓球スコアアプリ</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; }
+    button { margin: 5px; padding: 10px; font-size: 16px; }
+    .score { font-size: 48px; margin: 10px; display: inline-block; width: 80px; text-align: center; }
+    .server { font-weight: bold; color: green; }
+    #historyList { margin-top: 20px; max-height: 200px; overflow-y: auto; border-top: 1px solid #ccc; padding-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>卓球スコアアプリ</h1>
+
+  <div>
+    <label>ポイント毎のサーブ交代:
+      <select id="serveSwitchPoint" onchange="saveSettings()">
+        <option value="2">2点ずつ</option>
+        <option value="3">3点ずつ</option>
+      </select>
+    </label>
+  </div>
+
+  <div>
+    <label>最大セット数:
+      <select id="maxSets" onchange="saveSettings()">
+        <option value="1">1セット</option>
+        <option value="3">3セット</option>
+        <option value="5" selected>5セット</option>
+        <option value="7">7セット</option>
+      </select>
+    </label>
+  </div>
+
+  <div>
+    <button onclick="addPoint('A')">A +</button>
+    <span id="scoreA" class="score">0</span>
+    <span id="serverA" class="server">⚪</span>
+  </div>
+  <div>
+    <button onclick="addPoint('B')">B +</button>
+    <span id="scoreB" class="score">0</span>
+    <span id="serverB" class="server"></span>
+  </div>
+
+  <div>
+    <button onclick="nextSet()">次セットへ</button>
+    <button onclick="resetMatch()">試合リセット</button>
+  </div>
+
+  <div>
+    <h2>セット数</h2>
+    <p>A: <span id="setsA">0</span> - B: <span id="setsB">0</span></p>
+  </div>
+
+  <div>
+    <h2>試合履歴</h2>
+    <div id="historyList">まだ試合履歴はありません。</div>
+  </div>
+
+<script>
+  let scoreA = 0;
+  let scoreB = 0;
+  let setsA = 0;
+  let setsB = 0;
+  let currentSet = 1;
+  let serveSwitchPoint = 2; // 2点ずつ or 3点ずつ
+  let maxSets = 5;
+  let totalPointsInSet = 0; // ポイント数カウント
+  let server = 'A'; // 最初のサーバー
+
+  function saveSettings() {
+    serveSwitchPoint = parseInt(document.getElementById('serveSwitchPoint').value);
+    maxSets = parseInt(document.getElementById('maxSets').value);
+    localStorage.setItem('serveSwitchPoint', serveSwitchPoint);
+    localStorage.setItem('maxSets', maxSets);
+    resetMatch();
+  }
+
+  function loadSettings() {
+    serveSwitchPoint = parseInt(localStorage.getItem('serveSwitchPoint')) || 2;
+    maxSets = parseInt(localStorage.getItem('maxSets')) || 5;
+    document.getElementById('serveSwitchPoint').value = serveSwitchPoint;
+    document.getElementById('maxSets').value = maxSets;
+  }
+
+  function addPoint(player) {
+    if (isMatchOver()) return;
+    if (player === 'A') scoreA++; else scoreB++;
+    totalPointsInSet++;
+    updateServer();
+    checkSetEnd();
+    updateUI();
+  }
+
+  function updateServer() {
+    // サーブ切り替え判定
+    let cycle = serveSwitchPoint * 2;
+    let mod = totalPointsInSet % cycle;
+    if (mod < serveSwitchPoint) {
+      server = 'A';
+    } else {
+      server = 'B';
+    }
+  }
+
+  function checkSetEnd() {
+    if ((scoreA >= 11 || scoreB >= 11) && Math.abs(scoreA - scoreB) >= 2) {
+      // セット終了
+      if (scoreA > scoreB) setsA++;
+      else setsB++;
+      saveSetResult();
+      alert(`セット${currentSet}終了！A:${scoreA} - B:${scoreB}`);
+      if (isMatchOver()) {
+        alert(`試合終了！勝者は${setsA > setsB ? 'A' : 'B'}です！`);
+      } else {
+        // 自動で次セットにしたくない場合はコメントアウト
+        // nextSet();
+      }
+    }
+  }
+
+  function isMatchOver() {
+    return setsA > Math.floor(maxSets/2) || setsB > Math.floor(maxSets/2);
+  }
+
+  function nextSet() {
+    if (isMatchOver()) {
+      alert('試合はすでに終了しています。リセットしてください。');
+      return;
+    }
+    if ((scoreA >= 11 || scoreB >= 11) && Math.abs(scoreA - scoreB) >= 2) {
+      currentSet++;
+      scoreA = 0;
+      scoreB = 0;
+      totalPointsInSet = 0;
+      server = currentSet % 2 === 1 ? 'A' : 'B'; // セットごとにサーブ交代
+      updateUI();
+    } else {
+      alert('現在のセットは終了していません。');
+    }
+  }
+
+  function resetMatch() {
+    scoreA = 0;
+    scoreB = 0;
+    setsA = 0;
+    setsB = 0;
+    currentSet = 1;
+    totalPointsInSet = 0;
+    loadSettings();
+    server = 'A';
+    updateUI();
+    clearHistory();
+  }
+
+  function updateUI() {
+    document.getElementById('scoreA').textContent = scoreA;
+    document.getElementById('scoreB').textContent = scoreB;
+    document.getElementById('setsA').textContent = setsA;
+    document.getElementById('setsB').textContent = setsB;
+    document.getElementById('serverA').textContent = server === 'A' ? '⚪' : '';
+    document.getElementById('serverB').textContent = server === 'B' ? '⚪' : '';
+  }
+
+  function saveSetResult() {
+    let history = JSON.parse(localStorage.getItem('matchHistory') || "[]");
+    history.push({
+      timestamp: new Date().toLocaleString(),
+      set: currentSet,
+      scoreA: scoreA,
+      scoreB: scoreB,
+      setsA: setsA,
+      setsB: setsB,
+    });
+    localStorage.setItem('matchHistory', JSON.stringify(history));
+    loadHistory();
+  }
+
+  function loadHistory() {
+    let history = JSON.parse(localStorage.getItem('matchHistory') || "[]");
+    const div = document.getElementById('historyList');
+    if (history.length === 0) {
+      div.textContent = "まだ試合履歴はありません。";
+      return;
+    }
+    div.innerHTML = "";
+    history.forEach(item => {
+      const d = document.createElement('div');
+      d.textContent = `${item.timestamp} - セット${item.set} 結果: A ${item.scoreA} - B ${item.scoreB} | セット数 A:${item.setsA} B:${item.setsB}`;
+      div.appendChild(d);
+    });
+  }
+
+  function clearHistory() {
+    localStorage.removeItem('matchHistory');
+    loadHistory();
+  }
+
+  // 初期化
+  loadSettings();
+  updateUI();
+  loadHistory();
+</script>
+
+</body>
+</html>
